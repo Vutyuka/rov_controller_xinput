@@ -47,12 +47,6 @@
 
 #include <XInput.h>
 
-/* Type definitions */
-typedef struct button_t{
-  const uint8_t pin;
-  const uint8_t ctrl_button;
-}button_t;
-
 /* Pinout */
 #define button_num        11
 
@@ -72,13 +66,30 @@ typedef struct button_t{
 #define lights_toggle_pin 6
 #define util_toggle_pin   15
 
+#define the_joystick      JOY_LEFT
+
+/* Type definitions */
+typedef struct button_t{
+  const uint8_t pin;
+  const uint8_t ctrl_button;
+}button_t;
+
+typedef int motor_speed_t;
+
+enum motor_speed{
+  NEUTRAL,
+  SLOW,
+  FAST,
+  SPEED_STATE_NUM ,
+};
+
 /* Pin function assignment table */
 
 const button_t button_table[button_num]={
-  {.pin = forward_pin,        .ctrl_button = DPAD_UP},
-  {.pin = backward_pin,       .ctrl_button = DPAD_DOWN},
-  {.pin = right_pin,          .ctrl_button = DPAD_RIGHT},
-  {.pin = left_pin,           .ctrl_button = DPAD_LEFT},
+  {.pin = forward_pin,        .ctrl_button = JOY_LEFT},
+  {.pin = backward_pin,       .ctrl_button = JOY_LEFT},
+  {.pin = right_pin,          .ctrl_button = JOY_LEFT},
+  {.pin = left_pin,           .ctrl_button = JOY_LEFT},
 
   {.pin = up_pin,             .ctrl_button = BUTTON_Y},
   {.pin = down_pin,           .ctrl_button = BUTTON_A},
@@ -92,12 +103,39 @@ const button_t button_table[button_num]={
   {.pin = util_toggle_pin,    .ctrl_button = BUTTON_X},
 };
 
+const button_t joystick[4] = {
+  {.pin = forward_pin,        .ctrl_button = DPAD_UP},
+  {.pin = backward_pin,       .ctrl_button = DPAD_DOWN},
+  {.pin = right_pin,          .ctrl_button = DPAD_RIGHT},
+  {.pin = left_pin,           .ctrl_button = DPAD_LEFT},
+};
+
+
+
+static boolean toggle_prev_state;
+static motor_speed_t stick_state = SLOW;
+
+void increase_motor_speed(motor_speed_t stick_state){
+  stick_state=stick_state+1;
+
+  if(stick_state == SPEED_STATE_NUM){
+    stick_state = stick_state%SPEED_STATE_NUM + 1; //to skip 0 and SPEED_STATE_NUM
+  }
+}
+
 void setup() {
   //Every button will be a two-state push button
   //iterating on all the buttons
+
+  XInput.setJoystickRange(-(FAST+1), FAST+1);
+
+  
   for(int i = 0;i<button_num;i++){
     pinMode(button_table[i].pin,INPUT_PULLUP);
   }
+
+  toggle_prev_state = digitalRead(speed_toggle_pin);
+
 
 	XInput.begin();
   
@@ -109,8 +147,34 @@ void loop() {
     //read every button's state
     boolean current_button = !digitalRead(button_table[i].pin);
     //
-    XInput.setButton(button_table[i].ctrl_button,current_button);
+    if(button_table[i].ctrl_button == the_joystick){
+      switch(button_table[i].pin){
+        case forward_pin:
+          XInput.setJoystickY(the_joystick, (int32_t) stick_state);
+          break;
+        case backward_pin:
+          XInput.setJoystickY(the_joystick, (int32_t) -stick_state);
+          break;
+        case right_pin:
+          XInput.setJoystickX(the_joystick, (int32_t) stick_state);
+          break;
+        case left_pin:
+          XInput.setJoystickX(the_joystick, (int32_t) -stick_state);
+          break;
+      }
+    }else if(button_table[i].pin ==speed_toggle_pin){
+      
+      if(current_button != toggle_prev_state){
+
+        increase_motor_speed(stick_state);        
+        toggle_prev_state = current_button;
+      }
+
+    }else{
+      XInput.setButton(button_table[i].ctrl_button,current_button);
+    }
   }
+
   //send all the button states to the host
   XInput.send();
 }
