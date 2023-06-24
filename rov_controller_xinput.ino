@@ -36,7 +36,9 @@
  *                1. Add/remove pinout definition for pin.
  *                2. Add/remove pin to button_table.
  *                3. Change button_num.
- *
+ *                
+ *                Using Left Joystick with 4 push buttons. 
+ *                Joystick position/speed can be toggled by push button
  *                Tested on Pro Micro(has to be flashed as Leonardo).
  *
  *                To flash: Press reset just as the IDE shows "Uploading" promt
@@ -50,7 +52,7 @@
 /* Pinout */
 #define button_num        11
 
-#define forward_pin       7 
+#define forward_pin       3
 #define backward_pin      A1
 #define right_pin         14
 #define left_pin          16
@@ -58,7 +60,7 @@
 #define up_pin            10
 #define down_pin          2
 
-#define speed_toggle_pin  3
+#define speed_toggle_pin  7
 
 #define cam_up_pin        4
 #define cam_down_pin      5
@@ -83,6 +85,11 @@ enum motor_speed{
   SPEED_STATE_NUM ,
 };
 
+typedef struct joystick_coords_t{
+  int x;
+  int y;  
+ }joystick_coords_t;
+
 /* Pin function assignment table */
 
 const button_t button_table[button_num]={
@@ -103,23 +110,18 @@ const button_t button_table[button_num]={
   {.pin = util_toggle_pin,    .ctrl_button = BUTTON_X},
 };
 
-const button_t joystick[4] = {
-  {.pin = forward_pin,        .ctrl_button = DPAD_UP},
-  {.pin = backward_pin,       .ctrl_button = DPAD_DOWN},
-  {.pin = right_pin,          .ctrl_button = DPAD_RIGHT},
-  {.pin = left_pin,           .ctrl_button = DPAD_LEFT},
-};
 
 
 
 static boolean toggle_prev_state;
 static motor_speed_t stick_state = SLOW;
+static joystick_coords_t joystick_xy = {0,0};
 
-void increase_motor_speed(motor_speed_t stick_state){
-  stick_state=stick_state+1;
+void increase_motor_speed(motor_speed_t * stick_state){
+  stick_state[0]=stick_state[0]+1;
 
-  if(stick_state == SPEED_STATE_NUM){
-    stick_state = stick_state%SPEED_STATE_NUM + 1; //to skip 0 and SPEED_STATE_NUM
+  if(stick_state[0] == SPEED_STATE_NUM){
+    stick_state[0] = stick_state[0]%SPEED_STATE_NUM + 1; //to skip 0 and SPEED_STATE_NUM
   }
 }
 
@@ -127,14 +129,15 @@ void setup() {
   //Every button will be a two-state push button
   //iterating on all the buttons
 
-  XInput.setJoystickRange(-(FAST+1), FAST+1);
-
+  // joystick will  be for push buttons
+  XInput.setJoystickRange(-(FAST), FAST);
+  XInput.setJoystick(the_joystick,joystick_xy.x,joystick_xy.y);
   
   for(int i = 0;i<button_num;i++){
     pinMode(button_table[i].pin,INPUT_PULLUP);
   }
 
-  toggle_prev_state = digitalRead(speed_toggle_pin);
+  toggle_prev_state = 0;
 
 
 	XInput.begin();
@@ -142,39 +145,50 @@ void setup() {
 }
 
 void loop() {
-
+  //zeroing joystick values to be able to use addition at setting
+  joystick_xy = {0,0};
+  
   for(int i = 0;i<button_num;i++){
     //read every button's state
-    boolean current_button = !digitalRead(button_table[i].pin);
-    //
-    if(button_table[i].ctrl_button == the_joystick){
+    bool current_button = !digitalRead(button_table[i].pin);
+    //handling the push buttons as a joystick, getting pos from stick_state, set with button
+    if(button_table[i].ctrl_button == the_joystick ){
+      
       switch(button_table[i].pin){
         case forward_pin:
-          XInput.setJoystickY(the_joystick, (int32_t) stick_state);
+          joystick_xy.y += stick_state*current_button; // += to handle simultaneous button pushes
           break;
         case backward_pin:
-          XInput.setJoystickY(the_joystick, (int32_t) -stick_state);
+          joystick_xy.y += -stick_state*current_button; // if zero nothing is done
           break;
         case right_pin:
-          XInput.setJoystickX(the_joystick, (int32_t) stick_state);
+          joystick_xy.x += stick_state*current_button;
           break;
         case left_pin:
-          XInput.setJoystickX(the_joystick, (int32_t) -stick_state);
+          joystick_xy.x += -stick_state*current_button;
           break;
       }
-    }else if(button_table[i].pin ==speed_toggle_pin){
+       
+     //setting speed state here with toggling button
+    }else if(button_table[i].pin == speed_toggle_pin){
+     
       
-      if(current_button != toggle_prev_state){
+      if(!toggle_prev_state && current_button){ // only toggle from 0->1 change,  on button push
+//        static bool toggle_indicator = 0;
+//        toggle_indicator = !toggle_indicator;
+//        XInput.setButton(button_table[i].ctrl_button,toggle_indicator);
 
-        increase_motor_speed(stick_state);        
-        toggle_prev_state = current_button;
+          stick_state = stick_state%(SPEED_STATE_NUM-1) + 1;//cycling through discrete speeds and skipping 0 and SPEED_STATE_NUM
+          
       }
+      toggle_prev_state = current_button;
 
     }else{
       XInput.setButton(button_table[i].ctrl_button,current_button);
     }
   }
-
+  //setting joystick after all the buttons states are read
+  XInput.setJoystick(the_joystick,joystick_xy.x,joystick_xy.y);
   //send all the button states to the host
   XInput.send();
 }
