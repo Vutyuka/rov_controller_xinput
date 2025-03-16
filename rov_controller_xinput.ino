@@ -52,21 +52,21 @@
 /* Pinout */
 #define button_num        11
 
-#define forward_pin       3
-#define backward_pin      A1
-#define right_pin         14
-#define left_pin          16
+#define forward_pin       2
+#define backward_pin      4
+#define right_pin         3
+#define left_pin          5
 
-#define up_pin            10
-#define down_pin          2
+#define up_pin            21
+#define down_pin          20
 
-#define speed_toggle_pin  7
+#define speed_toggle_pin  15
 
-#define cam_up_pin        4
-#define cam_down_pin      5
+#define cam_up_pin        19
+#define cam_down_pin      18
 
-#define lights_toggle_pin 6
-#define util_toggle_pin   15
+#define lights_toggle_pin 14
+#define util_toggle_pin   16
 
 #define the_joystick      JOY_LEFT
 
