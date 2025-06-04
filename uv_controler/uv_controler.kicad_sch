@@ -5762,7 +5762,7 @@
 		)
 		(uuid "29b5ff7a-7fb5-4294-84a1-1d219cc1884f")
 	)
-	(label "JOY_LEFT_M"
+	(label "JOY_LEFT_D"
 		(at 50.8 96.52 0)
 		(effects
 			(font
